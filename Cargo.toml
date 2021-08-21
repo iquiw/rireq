@@ -1,0 +1,11 @@
+[package]
+name = "rireq"
+version = "0.1.0"
+edition = "2018"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+heed = { version = "0.11.0", default-features = false, features = ["mdbx", "serde-bincode"] }
+serde = { version = "1.0.127", features = ["derive"] }
