@@ -152,6 +152,18 @@ Least recently used time     : {} sec(s) ago",
         path.push(DB_VERSION);
         path
     }
+
+    #[cfg(not(windows))]
+    fn db_path() -> PathBuf {
+        let home = env::var("HOME").expect("HOME is set");
+        let mut path = PathBuf::from(home);
+        path.push(".local");
+        path.push("share");
+        path.push("rireq");
+        path.push("db");
+        path.push(DB_VERSION);
+        path
+    }
 }
 
 fn format_vec(v: &[String]) -> String {
