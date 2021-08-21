@@ -15,6 +15,7 @@ USAGE:
 
 SUBCOMMANDS:
     history
+    import <FILE>
     init bash
     record <COMMAND_LINE>
     stats
@@ -36,6 +37,12 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
             let db = Db::open()?;
             db.history()?;
             return Ok(());
+        } else if subcmd == "import" {
+            if let Some(file) = args.next() {
+                let db = Db::open()?;
+                db.import(&file)?;
+                return Ok(());
+            }
         } else if subcmd == "init" {
             if let Some(shell) = args.next() {
                 if shell == "bash" {

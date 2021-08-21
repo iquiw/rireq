@@ -1,11 +1,12 @@
 use std::cmp::{Ordering, Reverse};
 use std::env;
-use std::fs::create_dir_all;
-use std::path::PathBuf;
+use std::fs::{create_dir_all, File};
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use heed::types::{SerdeBincode, Str};
-use heed::{Database, Env, EnvOpenOptions, Result};
+use heed::{Database, Env, EnvOpenOptions, Result, RwTxn};
 
 use crate::record::{CmdData, CmdRecord};
 
@@ -34,16 +35,37 @@ impl Db {
         Ok(())
     }
 
-    pub fn record(&self, new_cmdrec: CmdRecord) -> Result<()> {
+    pub fn import<P>(&self, path: &P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let f = File::open(path)?;
+        let reader = BufReader::new(f);
         let mut wtxn = self.env.write_txn()?;
-        if let Some(mut cmd_data) = self.db.get(&wtxn, new_cmdrec.key())? {
-            cmd_data.update(new_cmdrec.last_exec_time());
-            self.db.put(&mut wtxn, new_cmdrec.key(), &cmd_data)?;
-        } else {
-            self.db
-                .put(&mut wtxn, new_cmdrec.key(), new_cmdrec.data())?;
+        let mut count = 0;
+        for line in reader.lines().flatten() {
+            self.record_txn(&mut wtxn, CmdRecord::new(line))?;
+            count += 1;
         }
         wtxn.commit()?;
+        println!("Imported {} history", count);
+        Ok(())
+    }
+
+    pub fn record(&self, new_cmdrec: CmdRecord) -> Result<()> {
+        let mut wtxn = self.env.write_txn()?;
+        self.record_txn(&mut wtxn, new_cmdrec)?;
+        wtxn.commit()?;
+        Ok(())
+    }
+
+    fn record_txn(&self, wtxn: &mut RwTxn, new_cmdrec: CmdRecord) -> Result<()> {
+        if let Some(mut cmd_data) = self.db.get(&wtxn, new_cmdrec.key())? {
+            cmd_data.update(new_cmdrec.last_exec_time());
+            self.db.put(wtxn, new_cmdrec.key(), &cmd_data)?;
+        } else {
+            self.db.put(wtxn, new_cmdrec.key(), new_cmdrec.data())?;
+        }
         Ok(())
     }
 
