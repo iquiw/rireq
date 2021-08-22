@@ -1,11 +1,11 @@
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdData {
     count: u64,
-    last_exec_time: SystemTime,
+    last_exec_time: u64,
 }
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct CmdRecord {
 impl CmdData {
     pub fn update(&mut self, time: &SystemTime) {
         self.count += 1;
-        self.last_exec_time = *time;
+        self.last_exec_time = time_to_u64(time);
     }
 }
 
@@ -27,7 +27,7 @@ impl CmdRecord {
             cmdline,
             cmd_data: CmdData {
                 count: 1,
-                last_exec_time: SystemTime::now(),
+                last_exec_time: time_to_u64(&SystemTime::now()),
             },
         }
     }
@@ -44,8 +44,8 @@ impl CmdRecord {
         self.cmd_data.count
     }
 
-    pub fn last_exec_time(&self) -> &SystemTime {
-        &self.cmd_data.last_exec_time
+    pub fn last_exec_time(&self) -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(self.cmd_data.last_exec_time)
     }
 
     pub fn key(&self) -> &str {
@@ -58,7 +58,7 @@ impl CmdRecord {
 
     pub fn rank(&self, max: u64, time: &SystemTime) -> u64 {
         let secs = time
-            .duration_since(*self.last_exec_time())
+            .duration_since(self.last_exec_time())
             .map(|d| d.as_secs())
             .unwrap_or(0_u64);
 
@@ -70,6 +70,12 @@ impl CmdRecord {
             u64::MAX
         }
     }
+}
+
+fn time_to_u64(time: &SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::from_secs(0))
+        .as_secs()
 }
 
 fn normalize(cmdline: &str) -> &str {
@@ -84,22 +90,22 @@ mod test {
     #[test]
     fn cmdrecord_rank_no_time_diff() {
         let mut cmdrec = CmdRecord::new("".into());
-        assert_eq!(cmdrec.rank(1000, cmdrec.last_exec_time()), u64::MAX);
+        assert_eq!(cmdrec.rank(1000, &cmdrec.last_exec_time()), u64::MAX);
 
         cmdrec.cmd_data.count = 200;
-        assert_eq!(cmdrec.rank(1000, cmdrec.last_exec_time()), u64::MAX);
+        assert_eq!(cmdrec.rank(1000, &cmdrec.last_exec_time()), u64::MAX);
     }
 
     #[test]
     fn cmdrecord_rank_compare() {
         let cmdrec_1count = CmdRecord::new("".into());
-        let time_1sec = *cmdrec_1count.last_exec_time() + Duration::from_secs(1);
-        let time_1day = *cmdrec_1count.last_exec_time() + Duration::from_secs(86400);
-        let time_2day = *cmdrec_1count.last_exec_time() + Duration::from_secs(86400 * 2);
+        let time_1sec = cmdrec_1count.last_exec_time() + Duration::from_secs(1);
+        let time_1day = cmdrec_1count.last_exec_time() + Duration::from_secs(86400);
+        let time_2day = cmdrec_1count.last_exec_time() + Duration::from_secs(86400 * 2);
 
         let mut cmdrec_1000count = CmdRecord::new("".into());
         cmdrec_1000count.cmd_data.count = 1000;
-        cmdrec_1000count.cmd_data.last_exec_time = *cmdrec_1count.last_exec_time();
+        cmdrec_1000count.cmd_data.last_exec_time = cmdrec_1count.cmd_data.last_exec_time;
         assert!(cmdrec_1count.rank(1000, &time_1sec) > cmdrec_1000count.rank(1000, &time_1day));
 
         let mut cmdrec_2000count = CmdRecord::new("".into());

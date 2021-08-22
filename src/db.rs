@@ -76,8 +76,8 @@ impl Db {
     }
 
     fn record_txn(&self, wtxn: &mut RwTxn, new_cmdrec: CmdRecord) -> Result<()> {
-        if let Some(mut cmd_data) = self.db.get(&wtxn, new_cmdrec.key())? {
-            cmd_data.update(new_cmdrec.last_exec_time());
+        if let Some(mut cmd_data) = self.db.get(wtxn, new_cmdrec.key())? {
+            cmd_data.update(&new_cmdrec.last_exec_time());
             self.db.put(wtxn, new_cmdrec.key(), &cmd_data)?;
         } else {
             self.db.put(wtxn, new_cmdrec.key(), new_cmdrec.data())?;
@@ -106,8 +106,8 @@ impl Db {
                     most_used_cmds.push(cmdrec.cmdline().into());
                 }
             }
-            if lr_used_time == UNIX_EPOCH || *cmdrec.last_exec_time() < lr_used_time {
-                lr_used_time = *cmdrec.last_exec_time();
+            if lr_used_time == UNIX_EPOCH || cmdrec.last_exec_time() < lr_used_time {
+                lr_used_time = cmdrec.last_exec_time();
                 lr_used_cmd = Some(cmdrec.cmdline().into())
             }
         }
