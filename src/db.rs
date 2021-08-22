@@ -5,7 +5,6 @@ use std::io::{stdout, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use csv::Writer;
 use heed::types::{SerdeBincode, Str};
 use heed::{Database, Env, EnvOpenOptions, Result, RwTxn};
 
@@ -29,8 +28,8 @@ impl Db {
         Ok(Db { db, env })
     }
 
-    pub fn export(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let mut writer = Writer::from_writer(stdout());
+    pub fn export_csv(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let mut writer = csv::Writer::from_writer(stdout());
         for cmdrec in self.sorted_history()? {
             writer.serialize(cmdrec)?;
         }

@@ -14,7 +14,7 @@ USAGE:
     {} <SUBCOMMAND>
 
 SUBCOMMANDS:
-    export
+    export-csv
     history
     import <FILE>
     init bash
@@ -34,9 +34,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn rireq() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
     if let Some(ref subcmd) = args.next() {
-        if subcmd == "export" {
+        if subcmd == "export-csv" {
             let db = Db::open()?;
-            return Ok(db.export()?);
+            return Ok(db.export_csv()?);
 
         } else if subcmd == "history" {
             let db = Db::open()?;
