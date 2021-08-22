@@ -1,6 +1,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
+use serde::ser::SerializeStruct;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CmdData {
@@ -8,10 +9,23 @@ pub struct CmdData {
     last_exec_time: u64,
 }
 
-#[derive(Debug)]
+#[derive(Deserialize, Debug)]
 pub struct CmdRecord {
     cmdline: String,
     cmd_data: CmdData,
+}
+
+impl Serialize for CmdRecord {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("CmdRecord", 3)?;
+        state.serialize_field("cmdline", &self.cmdline)?;
+        state.serialize_field("count", &self.cmd_data.count)?;
+        state.serialize_field("last_exec_time", &self.cmd_data.last_exec_time)?;
+        state.end()
+    }
 }
 
 impl CmdData {
