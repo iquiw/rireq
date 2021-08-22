@@ -17,6 +17,7 @@ SUBCOMMANDS:
     export-csv
     history
     import <FILE>
+    import-csv <FILE>
     init bash
     record <COMMAND_LINE>
     stats
@@ -46,6 +47,11 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(file) = args.next() {
                 let db = Db::open()?;
                 return Ok(db.import(&file)?);
+            }
+        } else if subcmd == "import-csv" {
+            if let Some(file) = args.next() {
+                let db = Db::open()?;
+                return Ok(db.import_csv(&file)?);
             }
         } else if subcmd == "init" {
             if let Some(shell) = args.next() {

@@ -60,6 +60,23 @@ impl Db {
         Ok(())
     }
 
+    pub fn import_csv<P>(&self, path: &P) -> std::result::Result<(), Box<dyn std::error::Error>>
+    where
+        P: AsRef<Path>,
+    {
+        let mut reader = csv::Reader::from_path(path)?;
+        let mut wtxn = self.env.write_txn()?;
+        let mut count = 0;
+        for result in reader.deserialize() {
+            let cmdrec: CmdRecord = result?;
+            self.record_txn(&mut wtxn, cmdrec)?;
+            count += 1;
+        }
+        wtxn.commit()?;
+        println!("Imported {} history", count);
+        Ok(())
+    }
+
     pub fn record(&self, new_cmdrec: CmdRecord) -> Result<()> {
         let mut wtxn = self.env.write_txn()?;
         self.record_txn(&mut wtxn, new_cmdrec)?;

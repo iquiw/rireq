@@ -12,6 +12,7 @@ pub struct CmdData {
 #[derive(Deserialize, Debug)]
 pub struct CmdRecord {
     cmdline: String,
+    #[serde(default, flatten)]
     cmd_data: CmdData,
 }
 
