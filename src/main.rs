@@ -14,6 +14,7 @@ USAGE:
     {} <SUBCOMMAND>
 
 SUBCOMMANDS:
+    export
     history
     import <FILE>
     init bash
@@ -33,15 +34,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn rireq() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args().skip(1);
     if let Some(ref subcmd) = args.next() {
-        if subcmd == "history" {
+        if subcmd == "export" {
             let db = Db::open()?;
-            db.history()?;
-            return Ok(());
+            return Ok(db.export()?);
+
+        } else if subcmd == "history" {
+            let db = Db::open()?;
+            return Ok(db.history()?);
+
         } else if subcmd == "import" {
             if let Some(file) = args.next() {
                 let db = Db::open()?;
-                db.import(&file)?;
-                return Ok(());
+                return Ok(db.import(&file)?);
             }
         } else if subcmd == "init" {
             if let Some(shell) = args.next() {
@@ -50,7 +54,7 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
                     return Ok(());
                 } else {
                     eprintln!("Unknown shell: {} (only \"bash\" supported)", shell);
-                    return Ok(());
+                    exit(1);
                 }
             }
         } else if subcmd == "record" {
@@ -59,10 +63,10 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
                 db.record(CmdRecord::new(cmdline))?;
             }
             return Ok(());
+
         } else if subcmd == "stats" {
             let db = Db::open()?;
-            db.stats()?;
-            return Ok(())
+            return Ok(db.stats()?);
         }
     }
     usage();

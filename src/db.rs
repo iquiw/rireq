@@ -28,6 +28,22 @@ impl Db {
         Ok(Db { db, env })
     }
 
+    pub fn export(&self) -> Result<()> {
+        for cmdrec in self.sorted_history()? {
+            println!(
+                "{},{},{}",
+                cmdrec.count(),
+                cmdrec
+                    .last_exec_time()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or_else(|_| Duration::from_secs(0))
+                    .as_secs(),
+                escape_csv(cmdrec.cmdline())
+            );
+        }
+        Ok(())
+    }
+
     pub fn history(&self) -> Result<()> {
         for cmdrec in self.sorted_history()? {
             println!("{}", cmdrec.cmdline());
@@ -166,6 +182,21 @@ Least recently used time     : {} sec(s) ago",
     }
 }
 
+fn escape_csv(s: &str) -> String {
+    let mut escaped = String::with_capacity(s.len() + 10);
+    escaped.push('"');
+    for c in s.chars() {
+        if c == '"' {
+            escaped.push('"');
+            escaped.push('"');
+        } else {
+            escaped.push(c);
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
 fn format_vec(v: &[String]) -> String {
     if v.len() > 3 {
         format!("{},.. ({} more)", v[..3].join(","), v.len() - 3)
@@ -176,7 +207,20 @@ fn format_vec(v: &[String]) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::format_vec;
+    use super::{escape_csv, format_vec};
+
+    #[test]
+    fn escape_csv_without_dquote() {
+        assert_eq!(escape_csv(""), "\"\"");
+        assert_eq!(escape_csv("abc"), "\"abc\"");
+        assert_eq!(escape_csv("abc,def"), "\"abc,def\"");
+    }
+
+    #[test]
+    fn escape_csv_with_dquote() {
+        assert_eq!(escape_csv("\""), "\"\"\"\"");
+        assert_eq!(escape_csv("abc\"def"), "\"abc\"\"def\"");
+    }
 
     #[test]
     fn format_vec_empty() {
