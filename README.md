@@ -1,5 +1,7 @@
 # rireq
 
+[![CI](https://github.com/iquiw/rireq/workflows/Rust/badge.svg)](https://github.com/iquiw/rireq/actions)
+
 Rireq is a simple bash history replacement.
 
 ## Requirements
