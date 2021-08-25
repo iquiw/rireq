@@ -16,6 +16,7 @@ pub struct CmdRecord {
     cmd_data: CmdData,
 }
 
+// Deriving Serialize does not work with csv crate.
 impl Serialize for CmdRecord {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -43,6 +44,16 @@ impl CmdRecord {
             cmd_data: CmdData {
                 count: 1,
                 last_exec_time: time_to_u64(&SystemTime::now()),
+            },
+        }
+    }
+
+    pub fn new_epoch(cmdline: String) -> Self {
+        CmdRecord {
+            cmdline,
+            cmd_data: CmdData {
+                count: 1,
+                last_exec_time: time_to_u64(&UNIX_EPOCH),
             },
         }
     }

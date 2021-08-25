@@ -52,7 +52,7 @@ impl Db {
         let mut wtxn = self.env.write_txn()?;
         let mut count = 0;
         for line in reader.lines().flatten() {
-            self.record_txn(&mut wtxn, CmdRecord::new(line))?;
+            self.record_txn(&mut wtxn, CmdRecord::new_epoch(line))?;
             count += 1;
         }
         wtxn.commit()?;
