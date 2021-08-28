@@ -4,7 +4,7 @@ _rireq_preexec() {
 
 _rireq_history() {
 	tput smcup
-	HISTORY="$(rireq history | fzf -q "$READLINE_LINE")"
+	HISTORY="$(rireq history | fzf +s -q "$READLINE_LINE")"
 	tput rmcup
 	READLINE_LINE=${HISTORY}
 	READLINE_POINT=${#READLINE_LINE}
