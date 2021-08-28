@@ -88,6 +88,10 @@ impl CmdRecord {
         &self.cmd_data
     }
 
+    pub fn is_ignored(&self) -> bool {
+        self.key().is_empty()
+    }
+
     pub fn rank(&self, max: u64, time: &SystemTime) -> u64 {
         let secs = time
             .duration_since(self.last_exec_time())
@@ -148,6 +152,17 @@ mod test {
                 last_exec_time: 2000000000
             }
         );
+    }
+
+    #[test]
+    fn cmdrecord_is_ignored() {
+        let cmdrec_empty = CmdRecord::new("".into());
+        let cmdrec_spaces = CmdRecord::new("   ".into());
+        let cmdrec_nonempty = CmdRecord::new("foo bar".into());
+
+        assert!(cmdrec_empty.is_ignored());
+        assert!(cmdrec_spaces.is_ignored());
+        assert!(!cmdrec_nonempty.is_ignored());
     }
 
     #[test]
