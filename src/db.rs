@@ -85,9 +85,9 @@ impl Db {
     }
 
     fn record_txn(&self, wtxn: &mut RwTxn, new_cmdrec: CmdRecord) -> Result<()> {
-        if let Some(mut cmd_data) = self.db.get(wtxn, new_cmdrec.key())? {
-            cmd_data.update(&new_cmdrec.last_exec_time());
-            self.db.put(wtxn, new_cmdrec.key(), &cmd_data)?;
+        if let Some(cmd_data) = self.db.get(wtxn, new_cmdrec.key())? {
+            let merged = cmd_data.merge(&new_cmdrec);
+            self.db.put(wtxn, new_cmdrec.key(), &merged)?;
         } else {
             self.db.put(wtxn, new_cmdrec.key(), new_cmdrec.data())?;
         }

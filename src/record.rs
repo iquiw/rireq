@@ -1,9 +1,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize, Serializer};
 use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CmdData {
     count: u64,
     last_exec_time: u64,
@@ -31,9 +31,15 @@ impl Serialize for CmdRecord {
 }
 
 impl CmdData {
-    pub fn update(&mut self, time: &SystemTime) {
-        self.count += 1;
-        self.last_exec_time = time_to_u64(time);
+    pub fn merge(&self, other: &CmdRecord) -> CmdData {
+        CmdData {
+            count: self.count + other.cmd_data.count,
+            last_exec_time: if self.last_exec_time < other.cmd_data.last_exec_time {
+                other.cmd_data.last_exec_time
+            } else {
+                self.last_exec_time
+            },
+        }
     }
 }
 
@@ -112,6 +118,37 @@ fn normalize(cmdline: &str) -> &str {
 mod test {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn cmddata_merge() {
+        let cmddata1 = CmdData {
+            count: 1,
+            last_exec_time: 0,
+        };
+        let cmddata2 = CmdData {
+            count: 2,
+            last_exec_time: 2000000000,
+        };
+        let cmddata3 = CmdData {
+            count: 3,
+            last_exec_time: 1000000000,
+        };
+        let cmdrec = CmdRecord::new_with_data("".into(), cmddata2);
+        assert_eq!(
+            cmddata1.merge(&cmdrec),
+            CmdData {
+                count: 3,
+                last_exec_time: 2000000000
+            }
+        );
+        assert_eq!(
+            cmddata3.merge(&cmdrec),
+            CmdData {
+                count: 5,
+                last_exec_time: 2000000000
+            }
+        );
+    }
 
     #[test]
     fn cmdrecord_rank_no_time_diff() {
