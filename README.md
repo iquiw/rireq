@@ -4,6 +4,10 @@
 
 Rireq is a simple bash history replacement.
 
+Unlike alternatives, it does not store working directory, exit status,
+etc., but only stores command execution count and last execution time and
+sort the history using them.
+
 ## Requirements
 
 ### Runtime
