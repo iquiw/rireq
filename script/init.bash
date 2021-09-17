@@ -3,11 +3,15 @@ _rireq_preexec() {
 }
 
 _rireq_history() {
+	local exit_code=0
 	tput smcup
 	HISTORY="$(rireq history | fzf +s -q "$READLINE_LINE")"
+	exit_code=$?
 	tput rmcup
-	READLINE_LINE=${HISTORY}
-	READLINE_POINT=${#READLINE_LINE}
+	if [ "$exit_code" -eq 0 ]; then
+		READLINE_LINE=${HISTORY}
+		READLINE_POINT=${#READLINE_LINE}
+	fi
 }
 
 _rireq_setup() {
