@@ -36,9 +36,13 @@ impl Db {
         Ok(())
     }
 
-    pub fn history(&self) -> Result<()> {
+    pub fn history(&self, print0: bool) -> Result<()> {
         for cmdrec in self.sorted_history()? {
-            println!("{}", cmdrec.cmdline());
+            if print0 {
+                print!("{}\0", cmdrec.cmdline());
+            } else {
+                println!("{}", cmdrec.cmdline());
+            }
         }
         Ok(())
     }

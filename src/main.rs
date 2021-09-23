@@ -15,7 +15,7 @@ USAGE:
 
 SUBCOMMANDS:
     export-csv
-    history
+    history [--print0]
     import <FILE>
     import-csv <FILE>
     init bash
@@ -40,8 +40,17 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
             return db.export_csv();
 
         } else if subcmd == "history" {
+            let mut print0 = false;
+            if let Some(option) = args.next() {
+                if option == "--print0" {
+                    print0 = true;
+                } else {
+                    eprintln!("Unknown history option: {}", option);
+                    exit(1);
+                }
+            }
             let db = Db::open()?;
-            return Ok(db.history()?);
+            return Ok(db.history(print0)?);
 
         } else if subcmd == "import" {
             if let Some(file) = args.next() {

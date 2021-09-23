@@ -5,7 +5,7 @@ _rireq_preexec() {
 _rireq_history() {
 	local exit_code=0
 	tput smcup
-	HISTORY="$(rireq history | fzf +s -q "$READLINE_LINE")"
+	HISTORY="$(rireq history --print0 | fzf --read0 +s -q "$READLINE_LINE")"
 	exit_code=$?
 	tput rmcup
 	if [ "$exit_code" -eq 0 ]; then
