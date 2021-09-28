@@ -38,7 +38,6 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
         if subcmd == "export-csv" {
             let db = Db::open()?;
             return db.export_csv();
-
         } else if subcmd == "history" {
             let mut print0 = false;
             if let Some(option) = args.next() {
@@ -51,7 +50,6 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
             }
             let db = Db::open()?;
             return Ok(db.history(print0)?);
-
         } else if subcmd == "import" {
             if let Some(file) = args.next() {
                 let db = Db::open()?;
@@ -78,7 +76,6 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
                 db.record(CmdRecord::new(cmdline))?;
             }
             return Ok(());
-
         } else if subcmd == "stats" {
             let db = Db::open()?;
             return Ok(db.stats()?);
