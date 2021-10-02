@@ -1,4 +1,4 @@
-use std::cmp::{Ordering, Reverse};
+use std::cmp::{min, Ordering, Reverse};
 use std::env;
 use std::fs::{create_dir_all, File};
 use std::io::{stdout, BufRead, BufReader};
@@ -103,8 +103,8 @@ impl Db {
 
     pub fn stats(&self) -> Result<()> {
         let mut num_cmds = 0;
-        let mut most_used_count = 0;
-        let mut most_used_cmds = Vec::<String>::new();
+        let mut top_used_cmds = Vec::<(u64, String)>::new();
+        let mut top_count = 0;
         let mut lr_used_cmd: Option<String> = None;
         let mut lr_used_time = UNIX_EPOCH;
 
@@ -112,15 +112,19 @@ impl Db {
         for (key, data) in self.db.iter(&rtxn)?.flatten() {
             let cmdrec = CmdRecord::new_with_data(key.into(), data);
             num_cmds += 1;
-            match cmdrec.count().cmp(&most_used_count) {
-                Ordering::Greater => {
-                    most_used_count = cmdrec.count();
-                    most_used_cmds = vec![cmdrec.cmdline().into()];
+            if cmdrec.count().cmp(&top_count) == Ordering::Greater {
+                if top_used_cmds.len() >= 5 {
+                    top_used_cmds.sort_by(|x, y| y.0.cmp(&x.0));
+                    top_used_cmds.pop();
                 }
-                Ordering::Less => {}
-                Ordering::Equal => {
-                    most_used_cmds.push(cmdrec.cmdline().into());
-                }
+                top_used_cmds.push((cmdrec.count(), cmdrec.cmdline().into()));
+                top_count = min(
+                    cmdrec.count(),
+                    top_used_cmds
+                        .first()
+                        .map(|x| x.0)
+                        .unwrap_or_else(|| cmdrec.count()),
+                );
             }
             if lr_used_time == UNIX_EPOCH || cmdrec.last_exec_time() < lr_used_time {
                 lr_used_time = cmdrec.last_exec_time();
@@ -132,16 +136,24 @@ impl Db {
 DB path: {}
 
 Number of commands     : {}
+",
+            Db::db_path().display(),
+            num_cmds
+        );
+        println!(
+            "Top {} used commands:
+   count | command",
+            top_used_cmds.len()
+        );
+        top_used_cmds.sort_by(|x, y| y.0.cmp(&x.0));
+        for (count, cmd) in top_used_cmds {
+            println!("   {:5} | {}", count, cmd);
+        }
 
-Most used command      : {}
-Most used count        : {}
-
+        println!(
+            "
 Least recently used command  : {}
 Least recently used time     : {} sec(s) ago",
-            Db::db_path().display(),
-            num_cmds,
-            format_vec(&most_used_cmds),
-            most_used_count,
             lr_used_cmd.unwrap_or_else(|| "N/A".into()),
             if lr_used_time == SystemTime::UNIX_EPOCH {
                 0
@@ -195,67 +207,5 @@ Least recently used time     : {} sec(s) ago",
         path.push("db");
         path.push(DB_VERSION);
         path
-    }
-}
-
-fn format_vec(v: &[String]) -> String {
-    if v.len() > 3 {
-        format!("{},.. ({} more)", v[..3].join(","), v.len() - 3)
-    } else {
-        v.join(",")
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::format_vec;
-
-    #[test]
-    fn format_vec_empty() {
-        assert_eq!(format_vec(&vec![]), "");
-    }
-
-    #[test]
-    fn format_vec_one_element() {
-        assert_eq!(format_vec(&vec!["abc".to_string()]), "abc");
-    }
-
-    #[test]
-    fn format_vec_multiple_elements_without_trunc() {
-        assert_eq!(
-            format_vec(&vec!["abc".to_string(), "def".to_string()]),
-            "abc,def"
-        );
-        assert_eq!(
-            format_vec(&vec![
-                "abc".to_string(),
-                "def".to_string(),
-                "ghi".to_string()
-            ]),
-            "abc,def,ghi"
-        );
-    }
-
-    #[test]
-    fn format_vec_multiple_elements_with_trunc() {
-        assert_eq!(
-            format_vec(&vec![
-                "abc".to_string(),
-                "def".to_string(),
-                "ghi".to_string(),
-                "jkl".to_string()
-            ]),
-            "abc,def,ghi,.. (1 more)"
-        );
-        assert_eq!(
-            format_vec(&vec![
-                "abc".to_string(),
-                "def".to_string(),
-                "ghi".to_string(),
-                "jkl".to_string(),
-                "mno".to_string()
-            ]),
-            "abc,def,ghi,.. (2 more)"
-        );
     }
 }
