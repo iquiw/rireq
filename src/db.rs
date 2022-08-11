@@ -5,27 +5,26 @@ use std::io::{stdout, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use heed::types::{SerdeBincode, Str};
-use heed::{Database, Env, EnvOpenOptions, Result, RwTxn};
+use libmdbx::{Database, Environment, NoWriteMap, Transaction, WriteFlags, RW};
 
 use crate::record::{CmdData, CmdRecord};
 
 const DB_VERSION: &str = "v1";
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 pub struct Db {
-    db: Database<Str, SerdeBincode<CmdData>>,
-    env: Env,
+    env: Environment<NoWriteMap>,
 }
 
 impl Db {
     pub fn open() -> Result<Self> {
-        let path = Db::db_path();
+        let path = Self::db_path();
         if !path.exists() {
             create_dir_all(&path)?;
         }
-        let env = EnvOpenOptions::new().open(&path)?;
-        let db: Database<Str, SerdeBincode<CmdData>> = env.create_database(None)?;
-        Ok(Db { db, env })
+        let env = Environment::new().open(&path)?;
+        Ok(Db { env })
     }
 
     pub fn export_csv(&self) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -53,10 +52,11 @@ impl Db {
     {
         let f = File::open(path)?;
         let reader = BufReader::new(f);
-        let mut wtxn = self.env.write_txn()?;
+        let wtxn = self.env.begin_rw_txn()?;
+        let db = wtxn.open_db(None)?;
         let mut count = 0;
         for line in reader.lines().flatten() {
-            self.record_txn(&mut wtxn, CmdRecord::new_epoch(line))?;
+            self.record_txn(&wtxn, &db, CmdRecord::new_epoch(line))?;
             count += 1;
         }
         wtxn.commit()?;
@@ -69,11 +69,12 @@ impl Db {
         P: AsRef<Path>,
     {
         let mut reader = csv::Reader::from_path(path)?;
-        let mut wtxn = self.env.write_txn()?;
+        let wtxn = self.env.begin_rw_txn()?;
+        let db = wtxn.open_db(None)?;
         let mut count = 0;
         for result in reader.deserialize() {
             let cmdrec: CmdRecord = result?;
-            self.record_txn(&mut wtxn, cmdrec)?;
+            self.record_txn(&wtxn, &db, cmdrec)?;
             count += 1;
         }
         wtxn.commit()?;
@@ -82,21 +83,30 @@ impl Db {
     }
 
     pub fn record(&self, new_cmdrec: CmdRecord) -> Result<()> {
-        let mut wtxn = self.env.write_txn()?;
-        self.record_txn(&mut wtxn, new_cmdrec)?;
+        let wtxn = self.env.begin_rw_txn()?;
+        let db = wtxn.open_db(None)?;
+        self.record_txn(&wtxn, &db, new_cmdrec)?;
         wtxn.commit()?;
         Ok(())
     }
 
-    fn record_txn(&self, wtxn: &mut RwTxn, new_cmdrec: CmdRecord) -> Result<()> {
+    fn record_txn(
+        &self,
+        wtxn: &Transaction<'_, RW, NoWriteMap>,
+        db: &Database<'_>,
+        new_cmdrec: CmdRecord,
+    ) -> Result<()> {
         if new_cmdrec.is_ignored() {
             return Ok(());
         }
-        if let Some(cmd_data) = self.db.get(wtxn, new_cmdrec.key())? {
+        let wflags = WriteFlags::UPSERT;
+        if let Some(cmd_data) = wtxn.get::<CmdData>(db, new_cmdrec.key().as_ref())? {
             let merged = cmd_data.merge(&new_cmdrec);
-            self.db.put(wtxn, new_cmdrec.key(), &merged)?;
+            let cmd_data = bincode::serialize(&merged)?;
+            wtxn.put(db, new_cmdrec.key(), &cmd_data, wflags)?;
         } else {
-            self.db.put(wtxn, new_cmdrec.key(), new_cmdrec.data())?;
+            let cmd_data = bincode::serialize(&new_cmdrec.data())?;
+            wtxn.put(db, new_cmdrec.key(), cmd_data, wflags)?;
         }
         Ok(())
     }
@@ -108,9 +118,11 @@ impl Db {
         let mut lr_used_cmd: Option<String> = None;
         let mut lr_used_time = UNIX_EPOCH;
 
-        let rtxn = self.env.read_txn()?;
-        for (key, data) in self.db.iter(&rtxn)?.flatten() {
-            let cmdrec = CmdRecord::new_with_data(key.into(), data);
+        let rtxn = self.env.begin_ro_txn()?;
+        let db = rtxn.open_db(None)?;
+        for (key, data) in rtxn.cursor(&db)?.iter::<Vec<u8>, CmdData>().flatten() {
+            let cmd = std::str::from_utf8(&key)?;
+            let cmdrec = CmdRecord::new_with_data(cmd.into(), data);
             num_cmds += 1;
             if cmdrec.count().cmp(&top_count) == Ordering::Greater {
                 if top_used_cmds.len() >= 5 {
@@ -137,7 +149,7 @@ DB path: {}
 
 Number of commands     : {}
 ",
-            Db::db_path().display(),
+            Self::db_path().display(),
             num_cmds
         );
         println!(
@@ -168,14 +180,16 @@ Least recently used time     : {} sec(s) ago",
     }
 
     fn sorted_history(&self) -> Result<Vec<CmdRecord>> {
-        let rtxn = self.env.read_txn()?;
+        let rtxn = self.env.begin_ro_txn()?;
+        let db = rtxn.open_db(None)?;
         let mut max_count = 0;
-        let mut recs = self
-            .db
-            .iter(&rtxn)?
+        let mut recs = rtxn
+            .cursor(&db)?
+            .iter::<Vec<u8>, CmdData>()
             .flatten()
             .map(|(k, d)| {
-                let cmdrec = CmdRecord::new_with_data(k.into(), d);
+                let cmd = String::from_utf8_lossy(&k);
+                let cmdrec = CmdRecord::new_with_data(cmd.into(), d);
                 if cmdrec.count() > max_count {
                     max_count = cmdrec.count();
                 }

@@ -1,5 +1,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use bincode;
+use libmdbx::TableObject;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -14,6 +16,15 @@ pub struct CmdRecord {
     cmdline: String,
     #[serde(default, flatten)]
     cmd_data: CmdData,
+}
+
+impl<'tx> TableObject<'tx> for CmdData {
+    fn decode(data_val: &[u8]) -> Result<Self, libmdbx::Error>
+    where
+        Self: Sized,
+    {
+        bincode::deserialize(data_val).map_err(|_| libmdbx::Error::InvalidValue)
+    }
 }
 
 // Deriving Serialize does not work with csv crate.
