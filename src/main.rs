@@ -28,8 +28,10 @@ SUBCOMMANDS:
     );
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    rireq()
+fn main() {
+    if let Err(e) = rireq() {
+        eprintln!("{}", e);
+    }
 }
 
 fn rireq() -> Result<(), Box<dyn std::error::Error>> {
