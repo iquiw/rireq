@@ -126,8 +126,7 @@ impl Db {
 
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
-        let mut iter = table.range::<RangeFull, &str>(..)?;
-        while let Some((key, data)) = iter.next() {
+        for (key, data) in table.range::<RangeFull, &str>(..)? {
             let cmd_data = bincode::deserialize(&data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             num_cmds += 1;
@@ -190,9 +189,8 @@ Least recently used time     : {} sec(s) ago",
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
         let mut max_count = 0;
-        let mut iter = table.range::<RangeFull, &str>(..)?;
         let mut recs = vec![];
-        while let Some((key, data)) = iter.next() {
+        for (key, data) in table.range::<RangeFull, &str>(..)? {
             let cmd_data = bincode::deserialize(&data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             if cmdrec.count() > max_count {
