@@ -6,7 +6,6 @@ use std::ops::RangeFull;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use bincode;
 use redb::{Database, ReadableTable, Table, TableDefinition};
 
 use crate::record::{CmdData, CmdRecord};
@@ -26,7 +25,7 @@ impl Db {
         let path = Db::db_path();
         if let Some(parent) = path.parent() {
             if !parent.exists() {
-                create_dir_all(&parent)?;
+                create_dir_all(parent)?;
             }
         }
         let db = unsafe { Database::create(path, DB_SIZE)? };
@@ -107,7 +106,7 @@ impl Db {
             return Ok(());
         }
         if let Some(cmd_data_bytes) = table.get(new_cmdrec.key())? {
-            let cmd_data: CmdData = bincode::deserialize(&cmd_data_bytes)?;
+            let cmd_data: CmdData = bincode::deserialize(cmd_data_bytes)?;
             let merged = bincode::serialize(&cmd_data.merge(&new_cmdrec))?;
             table.insert(new_cmdrec.key(), &merged)?;
         } else {
@@ -127,7 +126,7 @@ impl Db {
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
         for (key, data) in table.range::<RangeFull, &str>(..)? {
-            let cmd_data = bincode::deserialize(&data)?;
+            let cmd_data = bincode::deserialize(data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             num_cmds += 1;
             if cmdrec.count().cmp(&top_count) == Ordering::Greater {
@@ -191,7 +190,7 @@ Least recently used time     : {} sec(s) ago",
         let mut max_count = 0;
         let mut recs = vec![];
         for (key, data) in table.range::<RangeFull, &str>(..)? {
-            let cmd_data = bincode::deserialize(&data)?;
+            let cmd_data = bincode::deserialize(data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             if cmdrec.count() > max_count {
                 max_count = cmdrec.count();

@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct CmdData {
     count: u64,
     last_exec_time: u64,

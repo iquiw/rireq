@@ -51,11 +51,11 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             let db = Db::open()?;
-            return Ok(db.history(print0)?);
+            return db.history(print0);
         } else if subcmd == "import" {
             if let Some(file) = args.next() {
                 let db = Db::open()?;
-                return Ok(db.import(&file)?);
+                return db.import(&file);
             }
         } else if subcmd == "import-csv" {
             if let Some(file) = args.next() {
@@ -80,7 +80,7 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         } else if subcmd == "stats" {
             let db = Db::open()?;
-            return Ok(db.stats()?);
+            return db.stats();
         }
     }
     usage();
