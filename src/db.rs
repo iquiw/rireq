@@ -2,7 +2,6 @@ use std::cmp::{min, Ordering, Reverse};
 use std::env;
 use std::fs::{create_dir_all, File};
 use std::io::{stdout, BufRead, BufReader};
-use std::ops::RangeFull;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -11,7 +10,6 @@ use redb::{Database, ReadableTable, Table, TableDefinition};
 use crate::record::{CmdData, CmdRecord};
 
 const DB_VERSION: &str = "v2";
-const DB_SIZE: usize = 1024 * 1024;
 const DB_TABLE: TableDefinition<str, [u8]> = TableDefinition::new("rireq");
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -28,7 +26,7 @@ impl Db {
                 create_dir_all(parent)?;
             }
         }
-        let db = unsafe { Database::create(path, DB_SIZE)? };
+        let db = unsafe { Database::create(path)? };
         Ok(Db { db })
     }
 
@@ -125,7 +123,7 @@ impl Db {
 
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
-        for (key, data) in table.range::<RangeFull, &str>(..)? {
+        for (key, data) in table.range::<&str>(..)? {
             let cmd_data = bincode::deserialize(data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             num_cmds += 1;
@@ -189,7 +187,7 @@ Least recently used time     : {} sec(s) ago",
         let table = rtxn.open_table(DB_TABLE)?;
         let mut max_count = 0;
         let mut recs = vec![];
-        for (key, data) in table.range::<RangeFull, &str>(..)? {
+        for (key, data) in table.range::<&str>(..)? {
             let cmd_data = bincode::deserialize(data)?;
             let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
             if cmdrec.count() > max_count {
