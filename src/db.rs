@@ -10,7 +10,7 @@ use redb::{Database, ReadableTable, Table, TableDefinition};
 use crate::record::{CmdData, CmdRecord};
 
 const DB_VERSION: &str = "v2";
-const DB_TABLE: TableDefinition<str, [u8]> = TableDefinition::new("rireq");
+const DB_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("rireq");
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -26,7 +26,7 @@ impl Db {
                 create_dir_all(parent)?;
             }
         }
-        let db = unsafe { Database::create(path)? };
+        let db = Database::create(path)?;
         Ok(Db { db })
     }
 
@@ -99,18 +99,17 @@ impl Db {
         Ok(())
     }
 
-    fn record_txn(&self, table: &mut Table<str, [u8]>, new_cmdrec: CmdRecord) -> Result<()> {
+    fn record_txn(&self, table: &mut Table<&str, &[u8]>, new_cmdrec: CmdRecord) -> Result<()> {
         if new_cmdrec.is_ignored() {
             return Ok(());
         }
-        if let Some(cmd_data_bytes) = table.get(new_cmdrec.key())? {
-            let cmd_data: CmdData = bincode::deserialize(cmd_data_bytes)?;
-            let merged = bincode::serialize(&cmd_data.merge(&new_cmdrec))?;
-            table.insert(new_cmdrec.key(), &merged)?;
+        let data = if let Some(cmd_data_bytes) = table.get(new_cmdrec.key())? {
+            let cmd_data: CmdData = bincode::deserialize(cmd_data_bytes.value())?;
+            bincode::serialize(&cmd_data.merge(&new_cmdrec))?
         } else {
-            let new_cmd_data = bincode::serialize(new_cmdrec.data())?;
-            table.insert(new_cmdrec.key(), &new_cmd_data)?;
-        }
+            bincode::serialize(new_cmdrec.data())?
+        };
+        table.insert(new_cmdrec.key(), data.as_slice())?;
         Ok(())
     }
 
@@ -124,8 +123,8 @@ impl Db {
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
         for (key, data) in table.range::<&str>(..)? {
-            let cmd_data = bincode::deserialize(data)?;
-            let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
+            let cmd_data = bincode::deserialize(data.value())?;
+            let cmdrec = CmdRecord::new_with_data(key.value().into(), cmd_data);
             num_cmds += 1;
             if cmdrec.count().cmp(&top_count) == Ordering::Greater {
                 if top_used_cmds.len() >= 5 {
@@ -188,8 +187,8 @@ Least recently used time     : {} sec(s) ago",
         let mut max_count = 0;
         let mut recs = vec![];
         for (key, data) in table.range::<&str>(..)? {
-            let cmd_data = bincode::deserialize(data)?;
-            let cmdrec = CmdRecord::new_with_data(key.into(), cmd_data);
+            let cmd_data = bincode::deserialize(data.value())?;
+            let cmdrec = CmdRecord::new_with_data(key.value().into(), cmd_data);
             if cmdrec.count() > max_count {
                 max_count = cmdrec.count();
             }
