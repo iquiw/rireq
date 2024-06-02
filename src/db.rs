@@ -9,7 +9,7 @@ use redb::{Database, ReadableTable, Table, TableDefinition};
 
 use crate::record::{CmdData, CmdRecord};
 
-const DB_VERSION: &str = "v2";
+const DB_VERSION: &str = "v2.1";
 const DB_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("rireq");
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -122,7 +122,8 @@ impl Db {
 
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
-        for (key, data) in table.range::<&str>(..)? {
+        for result in table.iter()? {
+            let (key, data) = result?;
             let cmd_data = bincode::deserialize(data.value())?;
             let cmdrec = CmdRecord::new_with_data(key.value().into(), cmd_data);
             num_cmds += 1;
@@ -186,7 +187,8 @@ Least recently used time     : {} sec(s) ago",
         let table = rtxn.open_table(DB_TABLE)?;
         let mut max_count = 0;
         let mut recs = vec![];
-        for (key, data) in table.range::<&str>(..)? {
+        for result in table.iter()? {
+            let (key, data) = result?;
             let cmd_data = bincode::deserialize(data.value())?;
             let cmdrec = CmdRecord::new_with_data(key.value().into(), cmd_data);
             if cmdrec.count() > max_count {
