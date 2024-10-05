@@ -59,7 +59,8 @@ impl Db {
         let wtxn = self.db.begin_write()?;
         {
             let mut table = wtxn.open_table(DB_TABLE)?;
-            for line in reader.lines().flatten() {
+            for result in reader.lines() {
+                let line = result?;
                 self.record_txn(&mut table, CmdRecord::new_epoch(line))?;
                 count += 1;
             }
