@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+          - x86_64-pc-windows-msvc
+          - x86_64-unknown-linux-musl
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install coreutils for macOS
+        if: matrix.os == 'macos-latest'
+        run: brew install coreutils
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: |
+          cargo build --target ${{ matrix.target }} --release --locked
+
+      - name: Package
+        run: |
+          exe=rireq
+          package="../release/rireq-${VERSION}-${TARGET}.tar.gz"
+          if [ "${OS}" = windows-latest ]; then
+            exe=rireq.exe
+          fi
+          mkdir dist release
+          mv "target/${TARGET}/release/${exe}" dist/
+          cd dist
+          tar caf "${package}" "${exe}"
+          sha256sum "${package}" > "${package}.sha256"
+        env:
+          OS: ${{ matrix.os }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{  github.ref_name }}
+        shell: bash
+
+      - name: Publish
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: 'release/*'
+          body: |
+            * rireq ${{ github.ref_name }}
