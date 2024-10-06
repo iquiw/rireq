@@ -1,8 +1,9 @@
 use std::cmp::{min, Ordering, Reverse};
 use std::env;
 use std::fs::{create_dir_all, File};
-use std::io::{stdout, BufRead, BufReader};
+use std::io::{stdout, BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use redb::{Database, ReadableTable, Table, TableDefinition};
@@ -32,14 +33,14 @@ impl Db {
 
     pub fn export_csv(&self) -> Result<()> {
         let mut writer = csv::Writer::from_writer(stdout());
-        for cmdrec in self.sorted_history()? {
+        for cmdrec in self.ranked_history()? {
             writer.serialize(cmdrec)?;
         }
         Ok(())
     }
 
     pub fn history(&self, print0: bool) -> Result<()> {
-        for cmdrec in self.sorted_history()? {
+        for cmdrec in self.ranked_history()? {
             if print0 {
                 print!("{}\0", cmdrec.cmdline());
             } else {
@@ -114,6 +115,45 @@ impl Db {
         Ok(())
     }
 
+    pub fn prune(&self, older: bool) -> Result<()> {
+        let (mut recs, _) = self.get_records()?;
+        if older {
+            recs.sort_by_key(|a| (a.count(), a.last_exec_time()));
+        } else {
+            recs.sort_by_key(|a| (a.count(), Reverse(a.last_exec_time())));
+        }
+        let mut child = Command::new("fzf")
+            .arg("--header=rireq prune")
+            .arg("--read0")
+            .arg("--multi")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+        {
+            let mut writer = BufWriter::new(child.stdin.take().unwrap());
+            for rec in recs {
+                write!(writer, "{}: {}\0", rec.count(), rec.cmdline())?;
+            }
+        }
+        let wtxn = self.db.begin_write()?;
+        {
+            let mut table = wtxn.open_table(DB_TABLE)?;
+            let reader = BufReader::new(child.stdout.take().unwrap());
+            for result in reader.lines() {
+                let line = result?;
+                if line.is_empty() {
+                    break;
+                }
+                if let Some((_, cmdline)) = line.split_once(" ") {
+                    table.remove(cmdline)?;
+                    println!("Deleted: {}", cmdline);
+                }
+            }
+        }
+        wtxn.commit()?;
+        Ok(())
+    }
+
     pub fn stats(&self) -> Result<()> {
         let mut num_cmds = 0;
         let mut top_used_cmds = Vec::<(u64, String)>::new();
@@ -183,7 +223,14 @@ Least recently used time     : {} sec(s) ago",
         Ok(())
     }
 
-    fn sorted_history(&self) -> Result<Vec<CmdRecord>> {
+    fn ranked_history(&self) -> Result<Vec<CmdRecord>> {
+        let (mut recs, max_count) = self.get_records()?;
+        let time = SystemTime::now();
+        recs.sort_by_key(|a| Reverse(a.rank(max_count, &time))); // descending order
+        Ok(recs)
+    }
+
+    fn get_records(&self) -> Result<(Vec<CmdRecord>, u64)> {
         let rtxn = self.db.begin_read()?;
         let table = rtxn.open_table(DB_TABLE)?;
         let mut max_count = 0;
@@ -197,9 +244,7 @@ Least recently used time     : {} sec(s) ago",
             }
             recs.push(cmdrec);
         }
-        let time = SystemTime::now();
-        recs.sort_by_key(|a| Reverse(a.rank(max_count, &time))); // descending order
-        Ok(recs)
+        Ok((recs, max_count))
     }
 
     #[cfg(windows)]

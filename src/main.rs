@@ -19,6 +19,7 @@ SUBCOMMANDS:
     import <FILE>
     import-csv <FILE>
     init bash
+    prune
     record <COMMAND_LINE>
     stats
 ",
@@ -72,6 +73,18 @@ fn rireq() -> Result<(), Box<dyn std::error::Error>> {
                     exit(1);
                 }
             }
+        } else if subcmd == "prune" {
+            let mut older = false;
+            if let Some(option) = args.next() {
+                if option == "--older" {
+                    older = true;
+                } else {
+                    eprintln!("Unknown prune option: {}", option);
+                    exit(1);
+                }
+            }
+            let db = Db::open()?;
+            return db.prune(older);
         } else if subcmd == "record" {
             if let Some(cmdline) = args.next() {
                 let db = Db::open()?;
