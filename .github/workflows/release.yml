@@ -52,8 +52,9 @@ jobs:
           fi
           mkdir dist release
           mv "target/${TARGET}/release/${exe}" dist/
+          cp LICENSE dist/
           cd dist
-          tar caf "${package}" "${exe}"
+          tar caf "${package}" "${exe}" LICENSE
           sha256sum "${package}" > "${package}.sha256"
         env:
           OS: ${{ matrix.os }}
