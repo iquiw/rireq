@@ -123,6 +123,7 @@ impl Db {
             recs.sort_by_key(|a| (a.count(), Reverse(a.last_exec_time())));
         }
         let mut child = Command::new("fzf")
+            .arg("--color=pointer:blue,marker:green")
             .arg("--header=rireq prune")
             .arg("--read0")
             .arg("--multi")
