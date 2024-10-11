@@ -46,7 +46,7 @@ jobs:
       - name: Package
         run: |
           exe=rireq
-          package="../release/rireq-${VERSION}-${TARGET}.tar.gz"
+          package="rireq-${VERSION}-${TARGET}.tar.gz"
           if [ "${OS}" = windows-latest ]; then
             exe=rireq.exe
           fi
@@ -54,7 +54,8 @@ jobs:
           mv "target/${TARGET}/release/${exe}" dist/
           cp LICENSE dist/
           cd dist
-          tar caf "${package}" "${exe}" LICENSE
+          tar caf "../release/${package}" "${exe}" LICENSE
+          cd ../release
           sha256sum "${package}" > "${package}.sha256"
         env:
           OS: ${{ matrix.os }}
