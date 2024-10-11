@@ -127,6 +127,7 @@ impl Db {
             .arg("--header=rireq prune")
             .arg("--read0")
             .arg("--multi")
+            .arg("+s")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
