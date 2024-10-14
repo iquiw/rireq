@@ -4,6 +4,7 @@ use std::fs::{create_dir_all, File};
 use std::io::{stdout, BufRead, BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::str;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use redb::{Database, ReadableTable, Table, TableDefinition};
@@ -125,6 +126,7 @@ impl Db {
         let mut child = Command::new("fzf")
             .arg("--color=pointer:blue,marker:green")
             .arg("--header=rireq prune")
+            .arg("--print0")
             .arg("--read0")
             .arg("--multi")
             .arg("+s")
@@ -140,9 +142,15 @@ impl Db {
         let wtxn = self.db.begin_write()?;
         {
             let mut table = wtxn.open_table(DB_TABLE)?;
-            let reader = BufReader::new(child.stdout.take().unwrap());
-            for result in reader.lines() {
-                let line = result?;
+            let mut reader = BufReader::new(child.stdout.take().unwrap());
+            let mut buf = vec![];
+            loop {
+                let size = reader.read_until(b'\0', &mut buf)?;
+                if size == 0 {
+                    break;
+                }
+                buf.truncate(size - 1);
+                let line = str::from_utf8(&buf)?;
                 if line.is_empty() {
                     break;
                 }
@@ -150,6 +158,7 @@ impl Db {
                     table.remove(cmdline)?;
                     println!("Deleted: {}", cmdline);
                 }
+                buf.clear();
             }
         }
         wtxn.commit()?;
